@@ -9,15 +9,28 @@
 </style>
 </head>
 <body><div class="app">
-<div class="head"><h1>Ceiling Configurator</h1><div class="sub">Раскладка подвесного акустического потолка по размерам или поверх тохнита</div></div>
+<div class="head"><h1>Ceiling Configurator</h1><div class="sub">Раскладка подвесного акустического потолка по размерам или поверх тохнита</div></div><div class="card" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;justify-content:flex-end">
+<button id="saveDrawingTop" style="background:#16a34a">СОХРАНИТЬ ЧЕРТЁЖ PNG</button>
+<button id="saveSvgTop" class="alt">СОХРАНИТЬ SVG</button>
+</div>
 <div class="card"><h3>1. Параметры потолка</h3><div class="small" style="margin-bottom:10px">Чёрная тема · панели центрируются по всему помещению · лампа идёт вдоль длинной стороны.</div><div class="grid">
 <div><label>Ширина помещения, мм</label><input id="rw" type="number" value="6000"></div><div><label>Длина помещения, мм</label><input id="rh" type="number" value="4800"></div>
 <div><label>Ширина панели, мм</label><input id="pw" type="number" value="1200"></div><div><label>Длина панели, мм</label><input id="ph" type="number" value="1200"></div><div><label>Количество панелей</label><input id="panelCount" type="number" value="—" readonly><div class="small">Рассчитывается автоматически по размерам комнаты, панели и зазору.</div></div>
 <div><label>Зазор между панелями, мм</label><input id="gap" type="number" value="3"></div><div><label>Отступ крепления, мм</label><input id="mount" type="number" value="400"></div>
 </div><div class="row" style="margin-top:10px">
-<div><label>Крепления на панель</label><input id="fastenerOffset" type="number" value="50" min="0"><div class="small">Отступ от края панели до центра крепления.</div></div>
-<div><label>Расстояние между креплениями</label><div id="fastenerInfo" class="status" style="margin-top:0">Внутри панели: — · между соседними панелями: —</div></div>
-</div><div class="row" style="margin-top:10px"><div><label>Лампа</label><input id="lamp" type="number" value="120" min="1"><div class="small">Ширина лампы, мм. Лампа идёт вдоль длинной стороны и имеет ту же длину, что и ряд панелей; оба конца совпадают с концами раскладки.</div></div><div><label>Раскладка панелей</label><div class="status" style="margin-top:0">Панели автоматически центрируются относительно всего помещения.</div></div></div>
+<div>
+<label>Крепления на панель</label>
+<input id="fastenerOffset" type="number" value="50" min="0">
+<div class="small">Отступ от края панели до центра каждого крепления.</div>
+</div>
+<div>
+<label>Расстояния между креплениями</label>
+<div id="fastenerInfo" class="status" style="margin-top:0;line-height:1.7">
+Внутри панели: <b>—</b><br>
+Между соседними панелями: <b>—</b>
+</div>
+</div>
+</div></div><div class="row" style="margin-top:10px"><div><label>Лампа</label><input id="lamp" type="number" value="120" min="1"><div class="small">Ширина лампы, мм. Лампа идёт вдоль длинной стороны и имеет ту же длину, что и ряд панелей; оба конца совпадают с концами раскладки.</div></div><div><label>Раскладка панелей</label><div class="status" style="margin-top:0">Панели автоматически центрируются относительно всего помещения.</div></div></div>
 <div class="actions"><button id="build">ПОСТРОИТЬ ЧЕРТЁЖ</button><button id="saveDrawing" class="alt">СОХРАНИТЬ ЧЕРТЁЖ PNG</button></div><div class="actions"><button id="reset" class="alt">СБРОСИТЬ</button></div><div id="status" class="status">Готово.</div></div>
 
 <div class="card"><h3>2. Тохнит и привязка масштаба</h3><div class="drop"><input id="planFile" type="file" accept="image/png,image/jpeg,image/webp,application/pdf,.pdf"><div class="note">Для интерактивной калибровки лучше PNG/JPG/WEBP. После загрузки нажмите две точки на известном отрезке на плане.</div></div>
@@ -49,35 +62,57 @@ $('selectRoom').onclick=()=>{selectMode='room';roomPoints=[];drawOverlay();msg('
 $('clearPoints').onclick=()=>{points=[];scale=null;$('scaleInfo').textContent='Не задан';drawOverlay()};$('clearRoom').onclick=()=>{roomPoints=[];$('roomInfo').textContent='Контур не задан.';drawOverlay()};
 function updateFastenerInfo(pw,gap){
   const off=Math.max(0,num('fastenerOffset'));
-  const inner=Math.max(0,pw-2*off);
-  const neighbor=2*off+gap;
-  $('fastenerInfo').innerHTML=`Внутри панели: <b>${inner} мм</b><br>Между соседними панелями: <b>${neighbor} мм</b>`;
+  const innerX=Math.max(0,pw-2*off);
+  const innerY=Math.max(0,ph-2*off);
+  const neighborX=2*off+gap;
+  const neighborY=2*off+gap;
+  $('fastenerInfo').innerHTML=`Внутри панели по ширине: <b>${innerX} мм</b><br>Внутри панели по длине: <b>${innerY} мм</b><br>Между соседними панелями: <b>${neighborX} мм</b>`;
 }
 function saveDrawing(){
   const svg=$('planSvg');
-  const data=new XMLSerializer().serializeToString(svg);
+  if(!svg || !svg.getAttribute('viewBox')){msg('Сначала постройте чертёж.','bad');return;}
+  const vb=svg.viewBox.baseVal;
+  const clone=svg.cloneNode(true);
+  clone.setAttribute('xmlns','http://www.w3.org/2000/svg');
+  clone.setAttribute('width',vb.width);
+  clone.setAttribute('height',vb.height);
+  const data=new XMLSerializer().serializeToString(clone);
   const blob=new Blob([data],{type:'image/svg+xml;charset=utf-8'});
   const url=URL.createObjectURL(blob);
   const img=new Image();
   img.onload=()=>{
-    const scale=2, c=document.createElement('canvas');
-    c.width=Math.max(1200,svg.viewBox.baseVal.width*scale);
-    c.height=Math.max(900,svg.viewBox.baseVal.height*scale);
+    const scale=2;
+    const c=document.createElement('canvas');
+    c.width=Math.ceil(vb.width*scale);
+    c.height=Math.ceil(vb.height*scale);
     const ctx=c.getContext('2d');
-    ctx.fillStyle='#ffffff';ctx.fillRect(0,0,c.width,c.height);
+    ctx.fillStyle='#ffffff';
+    ctx.fillRect(0,0,c.width,c.height);
     ctx.drawImage(img,0,0,c.width,c.height);
     URL.revokeObjectURL(url);
-    c.toBlob(b=>{
+    c.toBlob(blob2=>{
+      const u=URL.createObjectURL(blob2);
       const a=document.createElement('a');
-      a.href=URL.createObjectURL(b);
-      a.download='ceiling-drawing.png';
+      a.href=u;a.download='ceiling-drawing.png';
       document.body.appendChild(a);a.click();a.remove();
-      setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+      setTimeout(()=>URL.revokeObjectURL(u),1000);
+      msg('Чертёж сохранён как PNG.','ok');
     },'image/png');
   };
+  img.onerror=()=>{URL.revokeObjectURL(url);msg('Не удалось сохранить чертёж.','bad');};
   img.src=url;
 }
-function build(){try{const rw=num('rw'),rh=num('rh'),pw=num('pw'),ph=num('ph'),gap=num('gap'),mount=num('mount'),lamp=num('lamp'),fastenerOffset=num('fastenerOffset');if([rw,rh,pw,ph,lamp].some(x=>!isFinite(x)||x<=0)||gap<0||mount<0||fastenerOffset<0||fastenerOffset*2>pw||fastenerOffset*2>ph)throw Error('Проверьте размеры.');let cols=Math.floor((rw+gap)/(pw+gap)),rows=Math.floor((rh+gap)/(ph+gap));if(cols<1||rows<1)throw Error('Панель не помещается.');let usedW=cols*pw+(cols-1)*gap,usedH=rows*ph+(rows-1)*gap,ox=(rw-usedW)/2,oy=(rh-usedH)/2;$('cols').textContent=cols;$('rows').textContent=rows;$('total').textContent=cols*rows;$('panelCount').value=cols*rows;$('lampOut').textContent=lamp+' × '+(rw>=rh?usedW:usedH)+' мм';$('fastenerOut').textContent=(cols*rows*4)+' шт.';$('quantitySummary').textContent='Панелей: '+(cols*rows);updateFastenerInfo(pw,gap);
+function saveSvg(){
+  const svg=$('planSvg');
+  if(!svg || !svg.getAttribute('viewBox')){msg('Сначала постройте чертёж.','bad');return;}
+  const clone=svg.cloneNode(true);
+  clone.setAttribute('xmlns','http://www.w3.org/2000/svg');
+  const blob=new Blob([new XMLSerializer().serializeToString(clone)],{type:'image/svg+xml;charset=utf-8'});
+  const u=URL.createObjectURL(blob);
+  const a=document.createElement('a');a.href=u;a.download='ceiling-drawing.svg';
+  document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),1000);
+}
+function build(){try{const rw=num('rw'),rh=num('rh'),pw=num('pw'),ph=num('ph'),gap=num('gap'),mount=num('mount'),lamp=num('lamp'),fastenerOffset=num('fastenerOffset');if([rw,rh,pw,ph,lamp].some(x=>!isFinite(x)||x<=0)||gap<0||mount<0||fastenerOffset<0||fastenerOffset*2>pw||fastenerOffset*2>ph)throw Error('Проверьте размеры.');let cols=Math.floor((rw+gap)/(pw+gap)),rows=Math.floor((rh+gap)/(ph+gap));if(cols<1||rows<1)throw Error('Панель не помещается.');let usedW=cols*pw+(cols-1)*gap,usedH=rows*ph+(rows-1)*gap,ox=(rw-usedW)/2,oy=(rh-usedH)/2;$('cols').textContent=cols;$('rows').textContent=rows;$('total').textContent=cols*rows;$('panelCount').value=cols*rows;$('lampOut').textContent=lamp+' × '+(rw>=rh?usedW:usedH)+' мм';$('fastenerOut').textContent=(cols*rows*4)+' шт.';$('quantitySummary').textContent='Панелей: '+(cols*rows);updateFastenerInfo(pw,gap); $('fastenerInfo').className='status ok';
 const s=$('planSvg');clear(s);s.setAttribute('viewBox',`0 0 ${rw} ${rh}`);s.appendChild(make('rect',{x:0,y:0,width:rw,height:rh,fill:'#f8fafc',stroke:'#334155','stroke-width':12}));let i=1;for(let r=0;r<rows;r++)for(let c=0;c<cols;c++){const x=ox+c*(pw+gap),y=oy+r*(ph+gap),g=make('g',{});g.appendChild(make('rect',{x,y,width:pw,height:ph,fill:'#9fd0ff',stroke:'#475569','stroke-width':5}));[[x+fastenerOffset,y+fastenerOffset],[x+pw-fastenerOffset,y+fastenerOffset],[x+fastenerOffset,y+ph-fastenerOffset],[x+pw-fastenerOffset,y+ph-fastenerOffset]].forEach(p=>g.appendChild(make('circle',{cx:p[0],cy:p[1],r:18,fill:'#334155'})));g.appendChild(make('text',{x:x+pw/2,y:y+ph/2+20,'text-anchor':'middle','font-size':72,'font-family':'Arial','font-weight':'700'},'P'+String(i++).padStart(2,'0')));s.appendChild(g)}
 const lampLong=rw>=rh?usedW:usedH,lampWide=lamp;const lampX=rw>=rh?ox:(rw-lampWide)/2,lampY=rw>=rh?(rh-lampWide)/2:oy,lampW=rw>=rh?usedW:lampWide,lampH=rw>=rh?lampWide:usedH;s.appendChild(make('rect',{x:lampX,y:lampY,width:lampW,height:lampH,fill:'#fde047',stroke:'#ca8a04','stroke-width':10}));s.appendChild(make('text',{x:rw/2,y:rh/2+10,'text-anchor':'middle','font-size':34,'font-family':'Arial','font-weight':'700'},lampWide+' × '+lampLong+' мм'));
 if(cols>0){
@@ -90,11 +125,11 @@ if(cols>0){
     s.appendChild(make('text',{x:(a+b)/2,y:dy-10,'text-anchor':'middle','font-size':25,'font-family':'Arial','font-weight':'700',fill:'#6d28d9'},`Между соседними: ${2*fastenerOffset+gap} мм`));
   }
 }s.appendChild(make('text',{x:rw/2,y:55,'text-anchor':'middle','font-size':52,'font-family':'Arial','font-weight':'700'},`${rw} × ${rh} мм`));
-const p=$('panelSvg');clear(p);p.setAttribute('viewBox',`0 0 ${pw} ${ph}`);p.appendChild(make('rect',{x:0,y:0,width:pw,height:ph,fill:'#f8fafc',stroke:'#334155','stroke-width':10}));[[fastenerOffset,fastenerOffset,'T1'],[pw-fastenerOffset,fastenerOffset,'T2'],[fastenerOffset,ph-fastenerOffset,'B1'],[pw-fastenerOffset,ph-fastenerOffset,'B2'],[mount,ph/2,'L1'],[pw-mount,ph/2,'R1'],[pw/2,mount,'U1'],[pw/2,ph-mount,'U2']].forEach(q=>{p.appendChild(make('circle',{cx:q[0],cy:q[1],r:22,fill:'#334155'}));p.appendChild(make('text',{x:q[0]+28,y:q[1]+10,'font-size':32,'font-family':'Arial'},q[2]))});p.appendChild(make('text',{x:pw/2,y:ph/2+18,'text-anchor':'middle','font-size':65,'font-family':'Arial','font-weight':'700'},`${pw} × ${ph} мм`));
+const p=$('panelSvg');clear(p);p.setAttribute('viewBox',`0 0 ${pw} ${ph}`);p.appendChild(make('rect',{x:0,y:0,width:pw,height:ph,fill:'#f8fafc',stroke:'#334155','stroke-width':10}));[[fastenerOffset,fastenerOffset,'T1'],[pw-fastenerOffset,fastenerOffset,'T2'],[fastenerOffset,ph-fastenerOffset,'B1'],[pw-fastenerOffset,ph-fastenerOffset,'B2'],[mount,ph/2,'L1'],[pw-mount,ph/2,'R1'],[pw/2,mount,'U1'],[pw/2,ph-mount,'U2']].forEach(q=>{p.appendChild(make('circle',{cx:q[0],cy:q[1],r:22,fill:'#334155'}));p.appendChild(make('text',{x:q[0]+28,y:q[1]+10,'font-size':32,'font-family':'Arial'},q[2]))});p.appendChild(make('text',{x:pw/2,y:ph/2+18,'text-anchor':'middle','font-size':65,'font-family':'Arial','font-weight':'700'},`${pw} × ${ph} мм`));p.appendChild(make('text',{x:pw/2,y:fastenerOffset-18,'text-anchor':'middle','font-size':28,'font-family':'Arial','font-weight':'700',fill:'#dc2626'},`Между креплениями: ${Math.max(0,pw-2*fastenerOffset)} мм`));
 $('assemblyText').innerHTML=`<b>${cols} × ${rows} = ${cols*rows} панелей</b><br>Зазор: ${gap} мм<br>Креплений: ${cols*rows*4} шт. (4 на панель)<br>Отступ крепления от края: ${fastenerOffset} мм<br>Между креплениями внутри панели: ${Math.max(0,pw-2*fastenerOffset)} мм<br>Между креплениями соседних панелей: ${2*fastenerOffset+gap} мм<br>Центральная лампа: ${lamp} × ${rw>=rh?usedW:usedH} мм, вдоль длинной стороны; длина лампы совпадает с длиной раскладки панелей<br><br>Панели центрируются относительно всего помещения. Если используется тохнит: после калибровки и выбора двух углов помещения раскладка переносится на план.`;
 if(scale&&roomPoints.length===2) overlayCeiling();msg(`Построено: ${cols} × ${rows} = ${cols*rows} панелей. Лампа ${lamp} × ${Math.max(rw,rh)} мм вдоль длинной стороны, по центру. Панели центрированы по комнате.`,'ok');}catch(e){msg('Ошибка: '+e.message,'bad')}}
 function overlayCeiling(){if(!scale||roomPoints.length!==2)return;const rw=num('rw'),rh=num('rh'),pw=num('pw'),ph=num('ph'),gap=num('gap'),lamp=num('lamp');const W=Math.abs(roomPoints[1].x-roomPoints[0].x)*$('planImg').naturalWidth*scale,H=Math.abs(roomPoints[1].y-roomPoints[0].y)*$('planImg').naturalHeight*scale;const sx=(Math.min(roomPoints[0].x,roomPoints[1].x))*$('planImg').naturalWidth,sy=Math.min(roomPoints[0].y,roomPoints[1].y)*$('planImg').naturalHeight;const cols=Math.floor((W+gap)/(pw+gap)),rows=Math.floor((H+gap)/(ph+gap)),usedW=cols*pw+(cols-1)*gap,usedH=rows*ph+(rows-1)*gap,ox=(W-usedW)/2,oy=(H-usedH)/2;const c=$('overlay'),ctx=c.getContext('2d'),box=$('planBox'),w=box.clientWidth,h=box.clientHeight;c.width=w*devicePixelRatio;c.height=h*devicePixelRatio;ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);ctx.clearRect(0,0,w,h);ctx.lineWidth=1;ctx.strokeStyle='rgba(30,41,59,.8)';const rx=roomPoints[1].x>roomPoints[0].x?roomPoints[0].x:roomPoints[1].x,ry=roomPoints[1].y>roomPoints[0].y?roomPoints[0].y:roomPoints[1].y;for(let r=0;r<rows;r++)for(let col=0;col<cols;col++){const x=rx+(sx?0:0);const px=(rx+((ox+col*(pw+gap))/W)*Math.abs(roomPoints[1].x-roomPoints[0].x))*w;const py=(ry+((oy+r*(ph+gap))/H)*Math.abs(roomPoints[1].y-roomPoints[0].y))*h;const ww=(pw/W)*Math.abs(roomPoints[1].x-roomPoints[0].x)*w,hh=(ph/H)*Math.abs(roomPoints[1].y-roomPoints[0].y)*h;ctx.strokeRect(px,py,ww,hh)}ctx.strokeStyle='#a16207';ctx.fillStyle='rgba(250,204,21,.78)';ctx.lineWidth=3;const roomWpx=Math.abs(roomPoints[1].x-roomPoints[0].x)*w,roomHpx=Math.abs(roomPoints[1].y-roomPoints[0].y)*h;const lx=rx*w,ly=ry*h;const panelSpanW=(usedW/W)*roomWpx,panelSpanH=(usedH/H)*roomHpx;const lw=roomWpx>=roomHpx?panelSpanW:(lamp/W)*roomWpx;const lh=roomWpx>=roomHpx?(lamp/W)*roomWpx:panelSpanH;const lox=roomWpx>=roomHpx?lx+(roomWpx-panelSpanW)/2:lx+(roomWpx-lw)/2;const loy=roomWpx>=roomHpx?ly+(roomHpx-lh)/2:ly+(roomHpx-panelSpanH)/2;ctx.fillRect(lox,loy,lw,lh);ctx.strokeRect(lox,loy,lw,lh);ctx.fillStyle='#854d0e';ctx.font='bold 12px Arial';ctx.textAlign='center';ctx.fillText('ЛАМПА '+lamp+' × '+Math.round(roomWpx>=roomHpx?usedW:usedH)+' мм',lox+lw/2,loy+lh/2+4);ctx.textAlign='start';}
-$('build').onclick=build;$('saveDrawing').onclick=saveDrawing;$('reset').onclick=()=>{['rw','rh','pw','ph','gap','mount','lamp','fastenerOffset'].forEach((id,i)=>$(id).value=[6000,4800,1200,1200,3,400,120,50][i]);build()};document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{document.querySelectorAll('[data-tab]').forEach(x=>x.classList.remove('on'));document.querySelectorAll('.view').forEach(x=>x.classList.remove('on'));b.classList.add('on');$(b.dataset.tab).classList.add('on')});window.addEventListener('resize',()=>{if(planImage)drawOverlay()});window.addEventListener('load',build);
+$('build').onclick=build;$('saveDrawing').onclick=saveDrawing;$('saveDrawingTop').onclick=saveDrawing;$('saveSvgTop').onclick=saveSvg;$('reset').onclick=()=>{['rw','rh','pw','ph','gap','mount','lamp','fastenerOffset'].forEach((id,i)=>$(id).value=[6000,4800,1200,1200,3,400,120,50][i]);build()};document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{document.querySelectorAll('[data-tab]').forEach(x=>x.classList.remove('on'));document.querySelectorAll('.view').forEach(x=>x.classList.remove('on'));b.classList.add('on');$(b.dataset.tab).classList.add('on')});window.addEventListener('resize',()=>{if(planImage)drawOverlay()});window.addEventListener('load',build);
 $('planImg').onload=()=>{planImage=true;drawOverlay()};
 })();
 </script></body></html>
